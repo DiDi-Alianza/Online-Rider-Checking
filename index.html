@@ -163,7 +163,7 @@
     <input type="password" class="field" id="admPw" placeholder="管理员密码">
     <div class="drop" id="drop"><span id="dropText">点击或拖入 xlsx / csv 文件</span>
       <input type="file" id="file" accept=".xlsx,.xls,.csv" class="hidden"></div>
-    <input type="text" class="field" id="snapLabel" placeholder="标签（可选，如 20:30）">
+    <select class="field" id="snapSlot"></select>
     <div class="okmsg" id="admOk"></div>
     <button class="dlbtn" id="snapBtn">生成快照</button>
     <div class="divider"></div>
@@ -348,7 +348,7 @@ function applyI18n(){
   $('#loginTitle').textContent=T().login_t;$('#loginSub').textContent=T().login_s;$('#loginBtn').textContent=T().login_b;
   $('#loginEmail').placeholder=T().login_email;$('#loginPw').placeholder=T().login_pw;
   $('#admTitle').textContent=T().adm_t;$('#admSub').textContent=T().adm_s;$('#admPw').placeholder=T().adm_pw;
-  $('#dropText').textContent=T().adm_drop;$('#snapBtn').textContent=T().adm_btn;$('#snapLabel').placeholder=T().adm_label;
+  $('#dropText').textContent=T().adm_drop;$('#snapBtn').textContent=T().adm_btn;
   $('#logBtn').textContent=T().log_btn;$('#admHint').textContent=T().adm_hint;
   $('#noteBody').innerHTML=T().note.map(p=>`<p>${p}</p>`).join('');
   if(USER){const role=USER.r==='master'?T().role_master:USER.r==='rm'?T().role_rm:T().role_v;$('#userChip').textContent=`👤 ${USER.n} · ${role}`;}
@@ -407,7 +407,9 @@ function riderRowsForVendor(vi,pairs){
 }
 function emitCSV(rows,fname,target){
   const t=T(),head=[t.v_vendor,t.col_rider,t.col_city,t.col_status];
-  const csv='\ufeff'+[head,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  // 长数字串（如19位 rider_id）用 Excel 文本公式 ="..." 强制按文本显示，避免被四舍五入成科学计数
+  const cell=c=>{const s=String(c); return /^\d{16,}$/.test(s)?`"=""${s}"""`:`"${s.replace(/"/g,'""')}"`;};
+  const csv='\ufeff'+[head,...rows].map(r=>r.map(cell).join(',')).join('\r\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download=fname.replace(/\s+/g,'_');a.click();
   saveLog({created_at:new Date().toISOString(),email:USER?.e||'',name:USER?.n||'',role:USER?.r||'',target,snapshot:(SNAPS[CUR].label||fmtTime(SNAPS[CUR].time))});
@@ -430,6 +432,13 @@ async function pollLatest(){if(CUR!==0)return;const f=await loadSnaps();if(!f.le
 
 /* ---------- upload ---------- */
 let pendingPairs=null;
+// 半小时时段下拉：00:00、00:30 … 23:30，默认选中当前最近的半点
+function fillSlots(){
+  const sel=$('#snapSlot'); if(!sel)return;
+  const opts=[]; for(let h=0;h<24;h++)for(let m=0;m<60;m+=30)opts.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+  const now=new Date(), cur=`${String(now.getHours()).padStart(2,'0')}:${now.getMinutes()<30?'00':'30'}`;
+  sel.innerHTML=opts.map(o=>`<option value="${o}"${o===cur?' selected':''}>${o}</option>`).join('');
+}
 function parseFile(file){const rd=new FileReader();rd.onload=e=>{let pairs=[];try{
     const wb=XLSX.read(e.target.result,{type:'binary'}),ws=wb.Sheets[wb.SheetNames[0]];
     let mc=0,mr=0;Object.keys(ws).forEach(k=>{if(k[0]==='!')return;const c=XLSX.utils.decode_cell(k);if(c.c>mc)mc=c.c;if(c.r>mr)mr=c.r;});
@@ -462,9 +471,13 @@ function bindAdmin(){
   $('#snapBtn').addEventListener('click',async()=>{
     if($('#admPw').value!==CFG.ADMIN_PASSWORD){$('#admErr').textContent=T().adm_ewp;return;}
     if(!pendingPairs){$('#admErr').textContent=T().adm_efile;return;}
-    await saveSnap({time:new Date().toISOString(),label:$('#snapLabel').value.trim(),online:pendingPairs});
-    SNAPS=await loadSnaps();SNAPS.sort((a,b)=>new Date(b.time)-new Date(a.time));CUR=0;
-    $('#admOk').textContent=T().adm_ok;pendingPairs=null;$('#dropText').textContent=T().adm_drop;$('#snapLabel').value='';
+    const newSnap={time:new Date().toISOString(),label:$('#snapSlot').value,online:pendingPairs};
+    await saveSnap(newSnap);
+    let fresh=await loadSnaps();
+    if(!fresh.length) fresh=[newSnap,...SNAPS];   // 网络抖动时也别清空看板，保留已有快照
+    else if(!fresh.some(s=>s.time===newSnap.time)) fresh=[newSnap,...fresh];
+    SNAPS=fresh;SNAPS.sort((a,b)=>new Date(b.time)-new Date(a.time));CUR=0;
+    $('#admOk').textContent=T().adm_ok;pendingPairs=null;$('#dropText').textContent=T().adm_drop;
     renderHist();render();setTimeout(()=>{$('#admin').classList.add('hidden');$('#admOk').textContent='';},700);});
   $('#logBtn').addEventListener('click',async()=>{
     if($('#admPw').value!==CFG.ADMIN_PASSWORD){$('#admErr').textContent=T().adm_ewp;return;}
@@ -472,7 +485,7 @@ function bindAdmin(){
     const h=T().log_h;const csv='\ufeff'+[h,...log.map(x=>[fmtTime(x.created_at),x.email,x.name,x.role,x.target,x.snapshot])]
       .map(r=>r.map(c=>`"${String(c==null?'':c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));a.download='download_log.csv';a.click();});
-  $('#adminBtn').addEventListener('click',()=>{$('#admErr').textContent='';$('#admin').classList.remove('hidden');});
+  $('#adminBtn').addEventListener('click',()=>{$('#admErr').textContent='';fillSlots();$('#admin').classList.remove('hidden');});
   $('#adminClose').addEventListener('click',()=>$('#admin').classList.add('hidden'));
 }
 
