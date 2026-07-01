@@ -127,6 +127,12 @@
   .xclose{position:absolute;top:14px;right:16px;color:var(--muted);background:none;border:none;font-size:20px;cursor:pointer}
   .divider{height:1px;background:var(--line-soft);margin:18px 0 14px}
   details.notes{margin-top:18px;border:1px solid var(--line-soft);border-radius:12px;background:rgba(12,30,20,.5);overflow:hidden}
+  .chartcard{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);border-radius:14px;padding:12px 12px 8px;margin:6px 0 8px}
+  .clab{font-family:var(--cond);font-weight:600;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;display:flex;justify-content:space-between;align-items:baseline}
+  .clab b{color:var(--turf);font-size:15px;font-family:var(--disp)}
+  .trendchart{width:100%;height:auto;display:block}
+  .spark{display:block;margin-top:4px;width:88px;height:22px}
+  .rmtrend{margin:2px 0 4px}
   details.notes summary{cursor:pointer;list-style:none;padding:13px 16px;font-family:var(--cond);font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:11px;color:var(--muted);display:flex;align-items:center;justify-content:space-between}
   details.notes summary::-webkit-details-marker{display:none}
   details.notes .arw{color:var(--turf);transition:transform .25s}
@@ -196,6 +202,7 @@
   <div class="meter"><div class="fill" id="ovFill"></div><div class="target" id="ovTarget"></div></div>
   <div class="submeta"><span class="live"><i></i>LIVE</span><span><span data-i="updated"></span> <b id="updTime">—</b></span></div>
   <div id="newWrap"></div>
+  <details class="notes" id="trendBox" open><summary><span id="trendTitle"></span><span class="arw">▸</span></summary><div style="padding:4px 12px 12px"><div id="trendOverall"></div></div></details>
   <div class="sec-title" id="titleA"></div>
   <div id="boardA"></div>
   <div class="sec-title" id="titleB"></div>
@@ -227,7 +234,7 @@ const CFG = {
 const I18N={
  zh:{eyebrow:"实时上线战报 · 每 30 分钟刷新",subtitle:"淘汰赛之夜 · RM 上线冲刺榜",
   s_online:"当前上线骑手",s_rate:"整体上线率",s_pool:"活跃骑手池",target:"今晚目标",updated:"更新于",
-  tA:n=>`大规模 RM · ${n}+ 骑手`,tB:n=>`中小规模 RM · <${n} 骑手`,notes:"口径说明",
+  tA:n=>`大规模 RM · ${n}+ 骑手`,tB:n=>`中小规模 RM · <${n} 骑手`,notes:"口径说明",trend_title:"📈 上线趋势（全网 · 每半小时）",trend_online:"当前在线",trend_rm:"本 RM 上线趋势",
   v_vendor:"Vendor",v_online:"上线",v_active:"活跃",v_rate:"上线率",v_off:"未上线",v_promise:"承诺",v_gap:"缺口",v_total:"合计",gap_note:"承诺=Vendor今日承诺上线数；缺口=承诺−当前在线，红色为还差人数、✓为已达成",
   dl_vendor:"下载",dl_rm:"下载本 RM 全部明细 (CSV)",dl_lock:"仅本人可下载",
   dlnote:"含每位骑手在线/离线状态，可直接催线",
@@ -247,7 +254,7 @@ const I18N={
    "登录后人人可见全榜单与各 Vendor 上线率；但『下载明细』仅限本人范围（Vendor 下自己、RM 下名下全部）。"]},
  en:{eyebrow:"Live online report · every 30 min",subtitle:"Knockout Night · RM Activation Leaderboard",
   s_online:"Riders online now",s_rate:"Overall online rate",s_pool:"Active rider pool",target:"Tonight's target",updated:"Updated",
-  tA:n=>`Large RMs · ${n}+ riders`,tB:n=>`Smaller RMs · <${n} riders`,notes:"Methodology",
+  tA:n=>`Large RMs · ${n}+ riders`,tB:n=>`Smaller RMs · <${n} riders`,notes:"Methodology",trend_title:"📈 Online trend (overall · every 30 min)",trend_online:"Online now",trend_rm:"This RM online trend",
   v_vendor:"Vendor",v_online:"Online",v_active:"Active",v_rate:"Rate",v_off:"Offline",v_promise:"Promised",v_gap:"Gap",v_total:"Total",gap_note:"Promised = vendor's committed online count today; Gap = promised − online now (red = still short, ✓ = met)",
   dl_vendor:"Download",dl_rm:"Download all riders of this RM (CSV)",dl_lock:"Only the owner can download",
   dlnote:"Includes each rider's online/offline status to chase offline riders",
@@ -267,7 +274,7 @@ const I18N={
    "Everyone can see the full leaderboard and every vendor's rate; downloads are limited to your own scope (a vendor downloads itself, an RM downloads all its vendors)."]},
  es:{eyebrow:"Reporte en vivo · cada 30 min",subtitle:"Noche de eliminatoria · Ranking de activación RM",
   s_online:"Repartidores en línea",s_rate:"Tasa de conexión",s_pool:"Pool activo",target:"Meta de hoy",updated:"Actualizado",
-  tA:n=>`RM grandes · ${n}+ repartidores`,tB:n=>`RM medianos · <${n} repartidores`,notes:"Metodología",
+  tA:n=>`RM grandes · ${n}+ repartidores`,tB:n=>`RM medianos · <${n} repartidores`,notes:"Metodología",trend_title:"📈 Tendencia en línea (global · cada 30 min)",trend_online:"En línea ahora",trend_rm:"Tendencia de este RM",
   v_vendor:"Vendor",v_online:"En línea",v_active:"Activos",v_rate:"Tasa",v_off:"Sin conectar",v_promise:"Prometido",v_gap:"Gap",v_total:"Total",gap_note:"Prometido = compromiso de hoy del vendor; Gap = prometido − en línea (rojo = faltan, ✓ = cumplido)",
   dl_vendor:"Descargar",dl_rm:"Descargar todos los repartidores de este RM (CSV)",dl_lock:"Solo el dueño puede descargar",
   dlnote:"Incluye el estado en línea/desconectado de cada repartidor para apurarlos",
@@ -360,6 +367,46 @@ function rateColor(rate,mn,mx){const t=mx===mn?1:(rate-mn)/(mx-mn),stops=[[255,9
   const seg=t<.5?0:1,lt=t<.5?t/.5:(t-.5)/.5,a=stops[seg],b=stops[seg+1];const c=a.map((v,i)=>Math.round(v+(b[i]-v)*lt));return `rgb(${c[0]},${c[1]},${c[2]})`;}
 const pct=r=>(r*100).toFixed(1);
 
+/* ---------- 上线趋势（按半小时快照）---------- */
+let _trendCache=null,_trendKey=null;
+function trend(){
+  const key=SNAPS.map(s=>s.time+':'+(s.online?s.online.length:0)).join('|');
+  if(_trendCache&&_trendKey===key)return _trendCache;
+  const asc=[...SNAPS].sort((a,b)=>new Date(a.time)-new Date(b.time));
+  _trendCache=asc.map(s=>({label:s.label||fmtTime(s.time).replace(/^.*?\s/,''),R:compute(s.online)}));
+  _trendKey=key;return _trendCache;
+}
+// 折线图（全网 / RM）：series=数值数组，labels=时段标签
+function lineSVG(series,labels,opt){
+  opt=opt||{};const col=opt.color||'var(--turf)';const H=opt.big?150:120,W=320;
+  const pL=8,pR=10,pT=18,pB=20,n=series.length;
+  if(!n)return '';
+  const maxY=Math.max(...series,1),plotW=W-pL-pR,plotH=H-pT-pB;
+  const X=i=>n===1?pL+plotW/2:pL+i*plotW/(n-1);
+  const Y=v=>pT+plotH-(v/maxY)*plotH;
+  const pts=series.map((v,i)=>[X(i),Y(v)]);
+  const line=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  const area=`M${pts[0][0].toFixed(1)} ${(H-pB).toFixed(1)} `+pts.map(p=>'L'+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')+` L${pts[n-1][0].toFixed(1)} ${(H-pB).toFixed(1)} Z`;
+  const gid='g'+Math.random().toString(36).slice(2,7);
+  const showEvery=n<=8?1:Math.ceil(n/6);
+  const dots=pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${i===n-1?3.5:2.5}" fill="${i===n-1?col:'var(--panel)'}" stroke="${col}" stroke-width="1.5"/>`).join('');
+  const vlab=pts.map((p,i)=>(n<=8||i===n-1||i===0)?`<text x="${p[0].toFixed(1)}" y="${(p[1]-6).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="${col}">${series[i]}</text>`:'').join('');
+  const xlab=labels.map((l,i)=>(i%showEvery===0||i===n-1)?`<text x="${X(i).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="9" fill="var(--muted)">${l}</text>`:'').join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="trendchart" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".28"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    <line x1="${pL}" y1="${(H-pB).toFixed(1)}" x2="${W-pR}" y2="${(H-pB).toFixed(1)}" stroke="var(--line)" stroke-width="1"/>
+    <path d="${area}" fill="url(#${gid})"/><path d="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}${vlab}${xlab}</svg>`;
+}
+// 迷你 sparkline（每个 Vendor 行）
+function sparkSVG(series){
+  const n=series.length;if(n<2)return '';const W=88,H=22,p=2,col='var(--turf)';
+  const maxY=Math.max(...series,1);const X=i=>p+i*(W-2*p)/(n-1),Y=v=>p+(H-2*p)-(v/maxY)*(H-2*p);
+  const line=series.map((v,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1)).join(' ');
+  const last=series[n-1];
+  return `<svg viewBox="0 0 ${W} ${H}" class="spark" xmlns="http://www.w3.org/2000/svg"><path d="${line}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${X(n-1).toFixed(1)}" cy="${Y(last).toFixed(1)}" r="2.4" fill="${col}"/></svg>`;
+}
+
 /* ---------- i18n ---------- */
 function applyI18n(){
   document.documentElement.lang=LANG==='zh'?'zh-CN':LANG;
@@ -371,6 +418,7 @@ function applyI18n(){
   $('#dropText').textContent=T().adm_drop;$('#snapBtn').textContent=T().adm_btn;
   $('#logBtn').textContent=T().log_btn;$('#admHint').textContent=T().adm_hint;
   if($('#mapBtn')){$('#mapBtn').textContent=T().map_btn; if(!pendingMap)$('#mapText').textContent=T().map_up;}
+  if($('#trendTitle')&&$('#trendTitle').textContent)$('#trendTitle').textContent=T().trend_title;
   $('#noteBody').innerHTML=T().note.map(p=>`<p>${p}</p>`).join('');
   if(USER){const role=USER.r==='master'?T().role_master:USER.r==='rm'?T().role_rm:T().role_v;$('#userChip').textContent=`👤 ${USER.n} · ${role}`;}
   renderHist();
@@ -388,6 +436,12 @@ function render(){
   $('#ovTarget').style.left=Math.min(CFG.TARGET*100,100)+'%';
   $('#updTime').textContent=(snap.label?snap.label+' · ':'')+fmtTime(snap.time);
   $('#newWrap').innerHTML=R.newOnline?`<div class="newchip">⚡ ${T().newonline(R.newOnline)} <span style="color:var(--muted)">${T().newonline2}</span></div>`:'';
+  (function(){const tr=trend();const box=$('#trendBox');
+    if(tr.length<1){box.style.display='none';return;} box.style.display='';
+    $('#trendTitle').textContent=T().trend_title;
+    const series=tr.map(t=>t.R.totOnline),labels=tr.map(t=>t.label),last=series[series.length-1];
+    $('#trendOverall').innerHTML=`<div class="clab"><span>${T().trend_online}</span><b>${last}</b></div>`+lineSVG(series,labels,{big:true});
+  })();
   $('#titleA').textContent=T().tA(CFG.TIER_SPLIT); $('#titleB').textContent=T().tB(CFG.TIER_SPLIT);
   const tierA=L.filter(d=>d.total>=CFG.TIER_SPLIT), tierB=L.filter(d=>d.total<CFG.TIER_SPLIT);
   renderBoard($('#boardA'),tierA,mn,mx,snap); renderBoard($('#boardB'),tierB,mn,mx,snap);
@@ -411,17 +465,21 @@ function toggleRM(row,pairs){
   const rm=decodeURIComponent(row.dataset.rm),R=compute(pairs),t=T();
   const vs=(vendorsByRM[rm]||[]).map(vi=>({vi,name:VENDORS[vi].name,total:R.vTot[vi]||0,online:R.vOn[vi]||0,off:(R.vTot[vi]||0)-(R.vOn[vi]||0),rate:(R.vTot[vi]||0)?(R.vOn[vi]||0)/(R.vTot[vi]||0):0,prom:promiseOf(vi)})).sort((a,b)=>b.rate-a.rate);
   let sumProm=0,sumOn=0;
+  const tr=trend(), multi=tr.length>=2;
   const body=vs.map(v=>{const c=v.rate>=.4?'var(--turf)':v.rate>=.3?'var(--amber)':'var(--heat)';
       const ctrl=scopeHas(v.vi)?`<span class="vdl" data-vi="${v.vi}">⬇ ${t.dl_vendor}</span>`:`<span class="vlock">🔒</span>`;
       const gapN=v.prom-v.online; sumProm+=v.prom; sumOn+=v.online;
       const gapCell=v.prom? `<b style="color:${gapN>0?'var(--heat)':'var(--turf)'}">${gapN>0?gapN:'✓'}</b>`:'—';
+      const spark=multi?sparkSVG(tr.map(x=>x.R.vOn[v.vi]||0)):'';
       return `<tr><td class="vname">${v.name}${v.off>0?` <span class="off">· ${v.off} ${t.v_off}</span>`:''}
-        <div class="vbar"><i style="width:${(v.rate*100).toFixed(0)}%;background:${c}"></i></div>${ctrl}</td>
+        <div class="vbar"><i style="width:${(v.rate*100).toFixed(0)}%;background:${c}"></i></div>${spark}${ctrl}</td>
         <td>${v.online}/${v.total}</td><td class="vrate" style="color:${c}">${pct(v.rate)}%</td>
         <td style="text-align:right">${v.prom||'—'}</td><td style="text-align:right">${gapCell}</td></tr>`;}).join('');
   const totGap=sumProm-sumOn;
   const totRow=sumProm?`<tr style="border-top:2px solid var(--line)"><td class="vname" style="font-weight:700">${t.v_total}</td><td><b>${sumOn}</b></td><td></td><td style="text-align:right"><b>${sumProm}</b></td><td style="text-align:right"><b style="color:${totGap>0?'var(--heat)':'var(--turf)'}">${totGap>0?totGap:'✓'}</b></td></tr>`:'';
-  panel.innerHTML=`<table class="vtab"><tr><th>${t.v_vendor}</th><th>${t.v_online}/${t.v_active}</th><th style="text-align:right">${t.v_rate}</th><th style="text-align:right">${t.v_promise}</th><th style="text-align:right">${t.v_gap}</th></tr>`+
+  const rmSeries=tr.map(x=>{const a=x.R.list.find(z=>z.rm===rm);return a?a.online:0});
+  const rmChart=multi?`<div class="chartcard rmtrend"><div class="clab"><span>${t.trend_rm}</span><b>${rmSeries[rmSeries.length-1]}</b></div>${lineSVG(rmSeries,tr.map(x=>x.label))}</div>`:'';
+  panel.innerHTML=rmChart+`<table class="vtab"><tr><th>${t.v_vendor}</th><th>${t.v_online}/${t.v_active}</th><th style="text-align:right">${t.v_rate}</th><th style="text-align:right">${t.v_promise}</th><th style="text-align:right">${t.v_gap}</th></tr>`+
     body+totRow+`</table>`+
     (rmOwned(rm)?`<button class="dlbtn" data-rm="${encodeURIComponent(rm)}">⬇ ${t.dl_rm}</button><div class="dlnote">${t.dlnote} · ${t.gap_note}</div>`:`<div class="dlnote">${t.gap_note}</div>`);
   panel.querySelectorAll('.vdl').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();downloadVendor(+b.dataset.vi,pairs);}));
