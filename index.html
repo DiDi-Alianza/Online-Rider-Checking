@@ -314,6 +314,12 @@ const rmOwned=rm=>(vendorsByRM[rm]||[]).length>0 && (vendorsByRM[rm]||[]).every(
 const SB=CFG.SUPABASE_URL&&CFG.SUPABASE_ANON_KEY;
 const LS_OK=(()=>{try{localStorage.setItem('_t','1');localStorage.removeItem('_t');return true;}catch(e){return false;}})();
 let MEM=[], MEMLOG=[];
+// 按“时段标签”排序（17:30、18:00…），凌晨(<6点)视为次日排在晚上之后；无标签退回上传时间
+function slotKey(s){const m=/^(\d{1,2}):(\d{2})/.exec((s&&s.label)||'');
+  if(m){let v=(+m[1])*60+(+m[2]); if(+m[1]<6)v+=1440; return v;}
+  const d=new Date(s.time); let v=d.getHours()*60+d.getMinutes(); if(d.getHours()<6)v+=1440; return v;}
+const bySlotAsc =(a,b)=>slotKey(a)-slotKey(b)||new Date(a.time)-new Date(b.time);
+const bySlotDesc=(a,b)=>slotKey(b)-slotKey(a)||new Date(b.time)-new Date(a.time);
 // 同一时段标签只保留最新的一条（晚几分钟重传=覆盖）；空标签各自保留
 function dedupSlots(arr){
   const best={},noLabel=[];
@@ -372,7 +378,7 @@ let _trendCache=null,_trendKey=null;
 function trend(){
   const key=SNAPS.map(s=>s.time+':'+(s.online?s.online.length:0)).join('|');
   if(_trendCache&&_trendKey===key)return _trendCache;
-  const asc=[...SNAPS].sort((a,b)=>new Date(a.time)-new Date(b.time));
+  const asc=[...SNAPS].sort(bySlotAsc);
   _trendCache=asc.map(s=>({label:s.label||fmtTime(s.time).replace(/^.*?\s/,''),R:compute(s.online)}));
   _trendKey=key;return _trendCache;
 }
@@ -513,9 +519,9 @@ async function initData(){
   const mrows=await loadMapping(); if(mrows&&mrows.length)applyMapping(mrows);
   SNAPS=await loadSnaps();
   if(!SNAPS.length){const seed={time:CFG.SEED_TIME,label:"",online:DATA.seed_online.slice()};if(!SB){await saveSnap(seed);SNAPS=await loadSnaps();}if(!SNAPS.length)SNAPS=[seed];}
-  SNAPS.sort((a,b)=>new Date(b.time)-new Date(a.time));CUR=0;renderHist();render();setInterval(pollLatest,90000);
+  SNAPS.sort(bySlotDesc);CUR=0;renderHist();render();setInterval(pollLatest,90000);
 }
-async function pollLatest(){if(CUR!==0)return;const f=await loadSnaps();if(!f.length)return;f.sort((a,b)=>new Date(b.time)-new Date(a.time));if(new Date(f[0].time)>new Date(SNAPS[0].time)){SNAPS=f;CUR=0;renderHist();render();}}
+async function pollLatest(){if(CUR!==0)return;const f=await loadSnaps();if(!f.length)return;f.sort(bySlotDesc);if(slotKey(f[0])>slotKey(SNAPS[0])||new Date(f[0].time)>new Date(SNAPS[0].time)){SNAPS=f;CUR=0;renderHist();render();}}
 
 /* ---------- upload ---------- */
 let pendingPairs=null;
@@ -627,7 +633,7 @@ function bindAdmin(){
     let fresh=await loadSnaps();
     if(!fresh.length) fresh=[newSnap,...SNAPS];   // 网络抖动时也别清空看板，保留已有快照
     else if(!fresh.some(s=>s.time===newSnap.time)) fresh=[newSnap,...fresh];
-    SNAPS=fresh;SNAPS.sort((a,b)=>new Date(b.time)-new Date(a.time));CUR=0;
+    SNAPS=fresh;SNAPS.sort(bySlotDesc);CUR=0;
     $('#admOk').textContent=T().adm_ok;pendingPairs=null;$('#dropText').textContent=T().adm_drop;
     renderHist();render();setTimeout(()=>{$('#admin').classList.add('hidden');$('#admOk').textContent='';},700);});
   $('#logBtn').addEventListener('click',async()=>{
